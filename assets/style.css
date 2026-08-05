@@ -1,0 +1,229 @@
+:root {
+  --bg: #ffffff;
+  --fg: #14120f;
+  --muted: #7a7369;
+  --rule: #e7e2da;
+  --box-bg: #f7f4ee;
+  --accent: #a8481f;
+  --accent-fg: #fff8f1;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #100f0d;
+    --fg: #ece7de;
+    --muted: #8a8478;
+    --rule: #29271f;
+    --box-bg: #1a1815;
+    --accent: #e08148;
+    --accent-fg: #100f0d;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  padding: 3.5rem 1.25rem 5rem;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  font-weight: 400;
+}
+main { max-width: 640px; margin: 0 auto; }
+section { margin-top: 4rem; }
+p { margin: 0 0 1.4rem; }
+p:last-child { margin-bottom: 0; }
+a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+.eyebrow {
+  margin: 0 0 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* name + nav */
+.name { margin: 0 0 0.5rem; font-size: 0.92rem; color: var(--muted); }
+.site-nav { margin: 0 0 3.5rem; font-size: 0.88rem; }
+.site-nav a { margin-right: 1.1rem; text-decoration: none; color: var(--fg); }
+.site-nav a:hover { text-decoration: underline; }
+.site-nav a.current { color: var(--accent); text-decoration: underline; }
+
+/* claim — the loudest text on the page besides the CTA */
+h1 {
+  margin: 0 0 1.7rem;
+  font-size: 1.65rem;
+  line-height: 1.32;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.claim p { font-size: 1.02rem; color: var(--fg); }
+.claim p:first-of-type { font-size: 1.14rem; line-height: 1.6; }
+.claim p:not(:first-of-type) { color: var(--muted); }
+
+/* signup — the one clear action */
+.signup { margin-top: 2.5rem; }
+.signup-box {
+  border: 1px solid var(--accent);
+  background: var(--box-bg);
+  border-radius: 10px;
+  padding: 1.6rem 1.5rem;
+}
+.signup-line { margin-bottom: 1.1rem; font-size: 1rem; }
+form { margin: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+input[type="email"] {
+  width: 100%;
+  padding: 0.85rem 0.9rem;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  appearance: none;
+}
+input[type="email"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[type="email"]::placeholder { color: var(--muted); }
+button {
+  padding: 0.85rem 0.9rem;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  cursor: pointer;
+  appearance: none;
+}
+button:hover { opacity: 0.9; }
+button:disabled { opacity: 0.45; cursor: default; }
+.note { margin-top: 0.7rem; font-size: 0.85rem; color: var(--muted); }
+.note a { color: inherit; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* section labels — quieter now that signup carries the weight */
+h2 {
+  margin: 0 0 1.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* experiment — read as index cards, not a list */
+.notes { display: flex; flex-direction: column; gap: 0.9rem; }
+.note-card {
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+}
+.note-card .term {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.note-card .def { margin: 0; }
+
+/* log / book / who — de-emphasized, footnote weight */
+.tight h2 { margin-bottom: 1.1rem; }
+.tight p { margin-bottom: 0.55rem; font-size: 0.96rem; }
+.book-title { font-weight: 600; color: var(--fg); font-size: 1rem; }
+.status { color: var(--muted); font-size: 0.9rem; }
+
+/* ---- single log article (post page) ---- */
+.log {
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--rule);
+  margin-top: 2.5rem;
+}
+.log:first-of-type { padding-top: 0; border-top: 0; margin-top: 0; }
+.log-date {
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.log h3 {
+  margin: 0 0 1.2rem;
+  font-size: 1.2rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+.log h4 {
+  margin: 2rem 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.log ul { margin: 0 0 1.1rem; padding-left: 1.2rem; }
+.log li { margin-bottom: 0.35rem; }
+.log blockquote {
+  margin: 0 0 1.1rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--accent);
+  color: var(--muted);
+}
+.log code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--box-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}
+
+/* ---- log list page (/log/index.html) ---- */
+.log-list { list-style: none; margin: 0; padding: 0; }
+.log-list li {
+  border-top: 1px solid var(--rule);
+  padding: 1.1rem 0;
+}
+.log-list li:first-child { border-top: 0; padding-top: 0; }
+.log-list a {
+  display: block;
+  text-decoration: none;
+}
+.log-list a:hover .log-list-title { text-decoration: underline; }
+.log-list-date {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+.log-list-title { font-weight: 600; color: var(--fg); }
+
+footer {
+  margin-top: 4.5rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+@media (min-width: 40rem) {
+  body { padding: 5rem 2rem 7rem; font-size: 18px; }
+  h1 { font-size: 2rem; }
+  .claim p:first-of-type { font-size: 1.2rem; }
+  form { flex-direction: row; }
+  input[type="email"] { flex: 1; }
+  button { flex: 0 0 auto; padding-inline: 1.4rem; }
+  .notes { flex-direction: row; flex-wrap: wrap; }
+  .note-card { flex: 1 1 calc(50% - 0.45rem); }
+}
