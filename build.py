@@ -197,6 +197,30 @@ def cdata(html_content):
     return "<![CDATA[%s]]>" % safe
 
 
+def build_sitemap(posts):
+    urls = [
+        ("%s/" % SITE_URL, None),
+        ("%s/about.html" % SITE_URL, None),
+        ("%s/log/" % SITE_URL, None),
+    ]
+    for p in posts:
+        urls.append(("%s/log/%s.html" % (SITE_URL, p["slug"]), p["date"]))
+
+    entries = []
+    for loc, lastmod in urls:
+        if lastmod:
+            entries.append("  <url>\n    <loc>%s</loc>\n    <lastmod>%s</lastmod>\n  </url>" % (loc, lastmod))
+        else:
+            entries.append("  <url>\n    <loc>%s</loc>\n  </url>" % loc)
+
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "%s\n"
+        "</urlset>\n" % "\n".join(entries)
+    )
+
+
 def build_rss(posts):
     items = []
     for p in posts:
@@ -252,11 +276,14 @@ def main():
 
     # ---- log/<slug>.html, one per post ----
     for post in posts:
+        post_url = "%s/log/%s.html" % (SITE_URL, post["slug"])
         page = post_tpl
         page = page.replace("{{NAV}}", render_nav(nav_raw, "/log/%s.html" % post["slug"]))
         page = page.replace("{{TITLE}}", escape(post["title"]))
         page = page.replace("{{DATE}}", escape(post["date"]))
         page = page.replace("{{BODY}}", post["body_html"])
+        page = page.replace("{{DESCRIPTION}}", escape(plain_excerpt(post["body_html"])))
+        page = page.replace("{{URL}}", post_url)
         out_path = LOG_DIR / ("%s.html" % post["slug"])
         out_path.write_text(page, encoding="utf-8")
         print("  wrote log/%s.html" % post["slug"])
@@ -285,6 +312,10 @@ def main():
     if old_feed.exists():
         old_feed.unlink()
         print("  removed feed.xml (replaced by rss.xml)")
+
+    # ---- sitemap.xml ----
+    (ROOT / "sitemap.xml").write_text(build_sitemap(posts), encoding="utf-8")
+    print("  wrote sitemap.xml")
 
     # ---- index.html: NAV + LATEST markers ----
     index_path = ROOT / "index.html"
