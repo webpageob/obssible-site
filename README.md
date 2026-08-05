@@ -60,7 +60,15 @@ python -m http.server 4173
 
 띄운 다음 브라우저에서 `localhost:4173` 열어서 확인.
 
-**7. 문제없으면 `site` 폴더 전체를 다시 Netlify에 끌어다 놓는다.**
+**7. 문제없으면 GitHub에 올린다.**
+
+```bash
+git add -A
+git commit -m "새 로그: 제목"
+git push
+```
+
+push하면 Netlify가 자동으로 감지해서 몇 십 초 안에 `obssible.com`에 그대로 반영한다. **더 이상 Netlify 화면에 폴더를 끌어다 놓을 필요 없다.**
 
 ## 글 고치기
 
@@ -117,6 +125,16 @@ python -m http.server 4173
 
 즉, 새 글 올리는 절차(위 1~7번)는 그대로고, `python build.py` 실행 → 배포 두 가지만 끝내면 그다음은 Buttondown이 알아서 이메일을 보낸다. 이 사이트에서 따로 발송 버튼을 누를 일은 없다.
 
-## 배포
+## 배포 — GitHub과 Netlify가 자동으로 연결돼 있다
 
-`site` 폴더 전체를 Netlify에 다시 끌어다 놓으면 된다. `build.py`는 내 컴퓨터에서만 돌리는 것이고, 그 결과물(HTML·XML 파일들)만 올라가면 된다.
+`site` 폴더는 GitHub 저장소(`webpageob/obssible-site`)와 연결돼 있고, 그 저장소는 Netlify와 연결돼 있다. **`git push` 한 줄이 곧 배포다.**
+
+```
+python build.py   (내 컴퓨터에서 HTML·RSS 생성)
+      ↓
+git push          (GitHub에 올리기)
+      ↓
+Netlify가 자동 감지 → obssible.com 갱신 (몇 십 초 안에)
+```
+
+Netlify 화면에 폴더를 직접 끌어다 놓는 옛날 방식은 이제 안 쓴다.
