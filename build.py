@@ -42,6 +42,14 @@ POSTS_DIR = ROOT / "posts"
 LOG_DIR = ROOT / "log"
 PARTIALS_DIR = ROOT / "partials"
 
+# On a Korean Windows install the console defaults to cp949, which cannot print
+# the em dashes this script uses in its warnings. Without this, a post with bad
+# frontmatter crashes the build with an encoding traceback instead of showing
+# the warning that explains what is wrong.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # Used only to build absolute links in rss.xml (RSS requires full URLs).
 # Change this if the site ever moves to a different domain.
 SITE_URL = "https://obssible.com"
@@ -118,25 +126,60 @@ def parse_post(path):
 
     title = meta.get("title", slug)
     date = meta.get("date", "")
-    if not date:
-        print("  ! %s has no 'date:' in its frontmatter — it will sort last" % path.name)
 
     return {
         "slug": slug,
         "title": title,
         "date": date,
         "body_html": md_to_html(body),
+        "source": path.name,
     }
+
+
+DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def validate_posts(posts):
+    """Reject anything that would silently produce wrong output.
+
+    These are hard failures, not warnings. A duplicate slug overwrites a real
+    post and loses it; a missing or malformed date sorts unpredictably and
+    renders blank. Both are invisible once published, so the build stops here.
+    """
+    problems = []
+
+    for post in posts:
+        if not post["date"]:
+            problems.append("%s has no 'date:' in its frontmatter" % post["source"])
+        elif not DATE_PATTERN.match(post["date"]):
+            problems.append(
+                "%s has date '%s' — it must look like 2026-08-06" % (post["source"], post["date"])
+            )
+        if not post["title"]:
+            problems.append("%s has no 'title:' in its frontmatter" % post["source"])
+
+    by_slug = {}
+    for post in posts:
+        by_slug.setdefault(post["slug"], []).append(post["source"])
+    for slug, sources in sorted(by_slug.items()):
+        if len(sources) > 1:
+            problems.append(
+                "slug '%s' is used by %d files (%s) — slugs must be unique, "
+                "otherwise one post overwrites the other"
+                % (slug, len(sources), ", ".join(sorted(sources)))
+            )
+
+    if problems:
+        raise SystemExit(
+            "BUILD FAILED — fix these before publishing:\n"
+            + "\n".join("  - %s" % p for p in problems)
+        )
 
 
 def load_posts():
     posts = [parse_post(p) for p in sorted(POSTS_DIR.glob("*.md"))]
+    validate_posts(posts)
     posts.sort(key=lambda p: p["date"], reverse=True)
-    seen = {}
-    for p in posts:
-        if p["slug"] in seen:
-            print("  ! two posts share the slug '%s' — one will overwrite the other" % p["slug"])
-        seen[p["slug"]] = True
     return posts
 
 

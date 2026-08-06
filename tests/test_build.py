@@ -96,6 +96,51 @@ def test_frontmatter_is_parsed(tmp_path):
     assert "<p>Body text.</p>" in parsed["body_html"]
 
 
+def _post(source, slug="s", title="T", date="2026-01-01"):
+    return {"source": source, "slug": slug, "title": title, "date": date, "body_html": ""}
+
+
+def test_valid_posts_pass_validation():
+    build.validate_posts([_post("a.md", slug="a"), _post("b.md", slug="b")])
+
+
+def test_duplicate_slugs_fail_the_build():
+    """Two posts with one slug means one silently overwrites the other."""
+    with pytest.raises(SystemExit) as exc:
+        build.validate_posts([_post("a.md", slug="same"), _post("b.md", slug="same")])
+    message = str(exc.value)
+    assert "same" in message
+    assert "a.md" in message and "b.md" in message
+
+
+def test_missing_date_fails_the_build():
+    with pytest.raises(SystemExit) as exc:
+        build.validate_posts([_post("a.md", date="")])
+    assert "no 'date:'" in str(exc.value)
+
+
+@pytest.mark.parametrize("bad_date", ["Aug 6 2026", "2026/08/06", "6-8-2026", "2026-8-6"])
+def test_malformed_date_fails_the_build(bad_date):
+    with pytest.raises(SystemExit) as exc:
+        build.validate_posts([_post("a.md", date=bad_date)])
+    assert "must look like" in str(exc.value)
+
+
+def test_missing_title_fails_the_build():
+    with pytest.raises(SystemExit) as exc:
+        build.validate_posts([_post("a.md", title="")])
+    assert "no 'title:'" in str(exc.value)
+
+
+def test_all_problems_are_reported_at_once():
+    """One build run should list every problem, not just the first."""
+    with pytest.raises(SystemExit) as exc:
+        build.validate_posts([_post("a.md", slug="x", date=""), _post("b.md", slug="x")])
+    message = str(exc.value)
+    assert "no 'date:'" in message
+    assert "slugs must be unique" in message
+
+
 def test_slug_falls_back_to_filename_when_missing(tmp_path):
     post = tmp_path / "fallback-name.md"
     post.write_text("---\ntitle: T\ndate: 2026-01-01\n---\nBody.", encoding="utf-8")
