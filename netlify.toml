@@ -2,9 +2,7 @@
 #
 # This is what makes browser-based publishing possible: a CMS can only commit
 # markdown, it cannot run Python. Without this, saved posts would never appear.
-#
-# build.py uses the Python standard library only — nothing to install.
 
 [build]
-  command = "python3 build.py"
+  command = "pip install -r requirements.txt && python3 build.py"
   publish = "."

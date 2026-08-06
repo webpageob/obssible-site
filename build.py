@@ -2,7 +2,9 @@
 """
 build.py — turns posts/*.md into the /log/ pages, keeps nav + the
 homepage "latest log" teaser in sync, and regenerates the RSS feed.
-No external packages needed.
+
+Needs one package: markdown-it-py (see requirements.txt). Everything
+else is the standard library.
 
 Run it every time you add, edit, delete, or rename a file in posts/,
 or after editing partials/nav.html:
@@ -37,6 +39,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from markdown_it import MarkdownIt
+
 ROOT = Path(__file__).parent
 POSTS_DIR = ROOT / "posts"
 LOG_DIR = ROOT / "log"
@@ -57,48 +61,26 @@ SITE_URL = "https://obssible.com"
 
 # ---------------------------------------------------------------- markdown
 
+# CommonMark + GFM tables/strikethrough. This covers everything a rich-text
+# CMS editor (Sveltia, Decap) can realistically emit — headings, lists
+# (ordered, unordered, nested), images, tables, code blocks, rules,
+# blockquotes, strikethrough, links, bold/italic.
+#
+# html=False is a deliberate, security-relevant choice: CommonMark allows raw
+# HTML passthrough by default, which would let a pasted <script> tag reach
+# production unescaped. This makes the parser treat raw HTML as plain text,
+# same as the parser it replaces.
+_md = MarkdownIt("commonmark", {"html": False}).enable(["table", "strikethrough"])
+
 
 def escape(text):
     return htmllib.escape(text, quote=False)
 
 
-def inline_md(text):
-    text = escape(text)
-    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-    text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", text)
-    text = re.sub(r"`(.+?)`", r"<code>\1</code>", text)
-    text = re.sub(r"\[(.+?)\]\((.+?)\)", r'<a href="\2">\1</a>', text)
-    return text
-
-
 def md_to_html(md_text):
-    lines = md_text.strip("\n").split("\n")
-    blocks = []
-    current = []
-    for line in lines:
-        if line.strip() == "":
-            if current:
-                blocks.append(current)
-                current = []
-        else:
-            current.append(line)
-    if current:
-        blocks.append(current)
-
-    out = []
-    for block in blocks:
-        first = block[0]
-        if first.startswith("## "):
-            out.append("<h2>%s</h2>" % inline_md(first[3:].strip()))
-        elif all(row.startswith("> ") or row == ">" for row in block):
-            quoted = " ".join(row[2:] if row.startswith("> ") else "" for row in block)
-            out.append("<blockquote>%s</blockquote>" % inline_md(quoted.strip()))
-        elif all(row.strip().startswith("- ") for row in block):
-            items = "".join("<li>%s</li>" % inline_md(row.strip()[2:].strip()) for row in block)
-            out.append("<ul>%s</ul>" % items)
-        else:
-            out.append("<p>%s</p>" % inline_md(" ".join(row.strip() for row in block)))
-    return "\n".join(out)
+    # .strip() drops the single trailing newline markdown-it always emits,
+    # so output matches what the rest of build.py (and its tests) expect.
+    return _md.render(md_text).strip()
 
 
 # ---------------------------------------------------------------- posts

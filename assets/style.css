@@ -180,26 +180,85 @@ button:disabled { opacity: 0.45; cursor: default; }
   font-weight: 600;
   letter-spacing: normal;
 }
-/* Subheadings inside post bodies (markdown "## ") */
+/* Subheadings inside post bodies. Convention: start at "## " (h2) — h1 is
+   the post title above. If a writer uses "#" it renders at title size,
+   which is a style choice to avoid, not a broken result. h4-h6 fall back
+   to h3's size: a personal log entry is not expected to nest that deep. */
 .log h2 {
   margin: 2rem 0 0.6rem;
   font-size: 1rem;
   font-weight: 600;
 }
-.log ul { margin: 0 0 1.1rem; padding-left: 1.2rem; }
+.log h3, .log h4, .log h5, .log h6 {
+  margin: 1.6rem 0 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.log ul, .log ol { margin: 0 0 1.1rem; padding-left: 1.3rem; }
 .log li { margin-bottom: 0.35rem; }
+.log li > ul, .log li > ol { margin-top: 0.35rem; margin-bottom: 0; }
+
+/* markdown-it wraps blockquote text in <p> (CommonMark requires it).
+   p:last-child already zeroes margin-bottom globally, so the blockquote's
+   own margin below is what creates the gap to the next element. */
 .log blockquote {
   margin: 0 0 1.1rem;
   padding-left: 1rem;
   border-left: 2px solid var(--accent);
   color: var(--muted);
 }
+
+.log img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.4rem 0 1.1rem;
+  border-radius: 4px;
+}
+
+.log hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.log table {
+  width: 100%;
+  margin: 0 0 1.1rem;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.log th, .log td {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--rule);
+  text-align: left;
+}
+.log th { color: var(--muted); font-weight: 600; }
+
+/* Inline `code` — small, sits in a line of text. */
 .log code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.9em;
   background: var(--box-bg);
   padding: 0.1em 0.3em;
   border-radius: 4px;
+}
+/* Fenced ```code blocks``` — the block itself carries the background and
+   scrolls horizontally instead of wrapping, so a long line (a URL, a
+   command) cannot force the page to scroll sideways. The inline-code
+   background/padding above is reset here so it does not double up. */
+.log pre {
+  margin: 0 0 1.1rem;
+  padding: 0.9rem 1rem;
+  background: var(--box-bg);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.log pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85em;
 }
 
 /* ---- log list page (/log/index.html) ---- */

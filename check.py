@@ -246,6 +246,23 @@ def check_no_generated_files_tracked():
         ok("only sources are tracked")
 
 
+def check_production_dependency_is_pinned():
+    step("requirements.txt exists and pins an exact version")
+    req = ROOT / "requirements.txt"
+    if not req.exists():
+        fail("requirements.txt is missing — Netlify's build command depends on it")
+        return
+    text = req.read_text(encoding="utf-8")
+    if "markdown-it-py==" not in text:
+        fail(
+            "requirements.txt does not pin an exact markdown-it-py version — "
+            "an unpinned dependency could change output on the next Netlify build "
+            "with nothing to review locally first"
+        )
+    else:
+        ok("markdown-it-py is version-pinned")
+
+
 # ---------------------------------------------------------------- main
 
 
@@ -255,6 +272,7 @@ def main():
     run([sys.executable, "-m", "pytest", "-q"], "pytest")
     run([sys.executable, "build.py"], "build")
 
+    check_production_dependency_is_pinned()
     check_idempotent()
     check_page_metadata()
     check_feeds()

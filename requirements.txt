@@ -1,0 +1,4 @@
+# Production dependency for build.py itself.
+# Pinned to an exact version — an unpinned markdown-it-py could change
+# output HTML on a Netlify rebuild with no local change to review first.
+markdown-it-py==4.2.0
