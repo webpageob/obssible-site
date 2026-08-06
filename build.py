@@ -49,6 +49,7 @@ SITE_URL = "https://obssible.com"
 
 # ---------------------------------------------------------------- markdown
 
+
 def escape(text):
     return htmllib.escape(text, quote=False)
 
@@ -81,20 +82,19 @@ def md_to_html(md_text):
         first = block[0]
         if first.startswith("## "):
             out.append("<h2>%s</h2>" % inline_md(first[3:].strip()))
-        elif all(l.startswith("> ") or l == ">" for l in block):
-            quoted = " ".join(l[2:] if l.startswith("> ") else "" for l in block)
+        elif all(row.startswith("> ") or row == ">" for row in block):
+            quoted = " ".join(row[2:] if row.startswith("> ") else "" for row in block)
             out.append("<blockquote>%s</blockquote>" % inline_md(quoted.strip()))
-        elif all(l.strip().startswith("- ") for l in block):
-            items = "".join(
-                "<li>%s</li>" % inline_md(l.strip()[2:].strip()) for l in block
-            )
+        elif all(row.strip().startswith("- ") for row in block):
+            items = "".join("<li>%s</li>" % inline_md(row.strip()[2:].strip()) for row in block)
             out.append("<ul>%s</ul>" % items)
         else:
-            out.append("<p>%s</p>" % inline_md(" ".join(l.strip() for l in block)))
+            out.append("<p>%s</p>" % inline_md(" ".join(row.strip() for row in block)))
     return "\n".join(out)
 
 
 # ---------------------------------------------------------------- posts
+
 
 def parse_post(path):
     text = path.read_text(encoding="utf-8")
@@ -104,7 +104,7 @@ def parse_post(path):
         end = text.find("\n---", 3)
         if end != -1:
             front = text[3:end].strip("\n")
-            body = text[end + 4:]
+            body = text[end + 4 :]
             for line in front.split("\n"):
                 if ":" in line:
                     key, _, val = line.partition(":")
@@ -142,6 +142,7 @@ def load_posts():
 
 # ---------------------------------------------------------------- nav
 
+
 def render_nav(nav_html, current_path):
     def mark(m):
         href = m.group(1)
@@ -173,6 +174,7 @@ def fill(template, values, template_name):
 
 
 # ---------------------------------------------------------------- rss
+
 
 def rfc822_date(date_str=None):
     if date_str:
@@ -218,7 +220,9 @@ def build_sitemap(posts):
     entries = []
     for loc, lastmod in urls:
         if lastmod:
-            entries.append("  <url>\n    <loc>%s</loc>\n    <lastmod>%s</lastmod>\n  </url>" % (loc, lastmod))
+            entries.append(
+                "  <url>\n    <loc>%s</loc>\n    <lastmod>%s</lastmod>\n  </url>" % (loc, lastmod)
+            )
         else:
             entries.append("  <url>\n    <loc>%s</loc>\n  </url>" % loc)
 
@@ -242,7 +246,8 @@ def build_rss(posts):
             "    <pubDate>%s</pubDate>\n"
             "    <description>%s</description>\n"
             "    <content:encoded>%s</content:encoded>\n"
-            "  </item>" % (
+            "  </item>"
+            % (
                 escape(p["title"]),
                 link,
                 link,
@@ -267,6 +272,7 @@ def build_rss(posts):
 
 
 # ---------------------------------------------------------------- main
+
 
 def clean_generated():
     """Delete previously generated output so stale files can never linger."""

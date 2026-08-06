@@ -1,0 +1,25 @@
+# Runs the same checks as `python check.py` on every push and pull request.
+# A red result blocks merging, so a broken build cannot reach the live site.
+
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install development tools
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run all checks
+        run: python check.py
