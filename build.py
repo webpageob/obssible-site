@@ -1,18 +1,29 @@
 #!/usr/bin/env python3
 """
-build.py — turns posts/*.md into the /log/ pages, keeps nav + the
-homepage "latest log" teaser in sync, and regenerates the RSS feed.
+build.py — turns posts into the /log/ pages, keeps nav + the homepage
+"latest log" teaser in sync, and regenerates the RSS feed.
 
-Needs one package: markdown-it-py (see requirements.txt). Everything
-else is the standard library.
+TRANSITIONAL STATE (started 2026-08-06): posts can come from TWO places
+at once — local posts/*.md files, and Sanity (a hosted CMS). This is
+deliberate, not an oversight. Sanity is the CMS being migrated to, but
+until it is fully verified in production, posts/*.md stays live as a
+working fallback — the project must never be left without a way to
+publish. Once Sanity has been used for real, working posts and that is
+confirmed end to end, posts/*.md and this note get removed in a separate
+change. See README.md.
+
+Needs two packages: markdown-it-py and portabletext-html (see
+requirements.txt). Everything else is the standard library — including
+the Sanity fetch, which is a plain HTTP GET, no SDK.
 
 Run it every time you add, edit, delete, or rename a file in posts/,
-or after editing partials/nav.html:
+after publishing in Sanity, or after editing partials/nav.html:
 
     python build.py
 
 SOURCE (edit these):
-  - posts/*.md                 your writing
+  - posts/*.md                 your writing (legacy path, see note above)
+  - Sanity Studio               your writing (new path)
   - partials/*.html            page templates and the shared nav
   - assets/style.css           all styling
 
@@ -33,13 +44,20 @@ See README.md for the full "how do I publish a new post" walkthrough.
 """
 
 import html as htmllib
+import json
+import os
 import re
 import shutil
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 from markdown_it import MarkdownIt
+from portabletext_html import PortableTextRenderer
+from portabletext_html.marker_definitions import LinkMarkerDefinition
 
 ROOT = Path(__file__).parent
 POSTS_DIR = ROOT / "posts"
@@ -158,8 +176,144 @@ def validate_posts(posts):
         )
 
 
+# ---------------------------------------------------------------- sanity
+#
+# Sanity stores content in its own cloud database ("Content Lake"), not in
+# this repo — build.py fetches it at build time over plain HTTP. No SDK,
+# and no secret is needed to read: the dataset is public, and Sanity's
+# documented behavior is that unauthenticated reads of a public dataset
+# automatically exclude drafts (their _id is prefixed "drafts."). The
+# explicit filter below is defense in depth in case that ever changes
+# (e.g. if a token gets added to this query later).
+#
+# If SANITY_PROJECT_ID isn't set, or the request fails for any reason,
+# this returns an empty list rather than raising. During this transitional
+# period that is correct: the build must fall back to posts/*.md, not
+# fail. Once posts/*.md is removed (see the module docstring), a fetch
+# failure should become fatal instead — that change belongs with that step.
+
+SANITY_PROJECT_ID = os.environ.get("SANITY_PROJECT_ID", "").strip()
+SANITY_DATASET = os.environ.get("SANITY_DATASET", "production").strip()
+SANITY_API_VERSION = "2024-01-01"  # pinned for stability, like requirements.txt
+
+_SAFE_URL_SCHEMES = ("http://", "https://", "mailto:")
+
+
+class _SafeLinkMarkerDefinition(LinkMarkerDefinition):
+    """
+    Replaces portabletext-html's default link renderer. Verified directly
+    that the default trusts href completely: no scheme check (a
+    javascript: URL renders as a real, clickable link) and no attribute
+    escaping (a crafted href can break out of the href="..." attribute).
+    This gives Sanity-sourced links the same safety property the
+    markdown-it-py path already has.
+    """
+
+    @classmethod
+    def _href(cls, marker, context):
+        marker_definition = next((md for md in context.markDefs if md["_key"] == marker), None)
+        return (marker_definition or {}).get("href", "") or ""
+
+    @classmethod
+    def render_prefix(cls, span, marker, context):
+        href = cls._href(marker, context)
+        if not href.startswith(_SAFE_URL_SCHEMES):
+            return "<span>"
+        return '<a href="%s">' % htmllib.escape(href, quote=True)
+
+    @classmethod
+    def render_suffix(cls, span, marker, context):
+        href = cls._href(marker, context)
+        return "</a>" if href.startswith(_SAFE_URL_SCHEMES) else "</span>"
+
+
+# Sanity encodes an image's id, size, and format into its asset reference:
+# "image-<hash>-<width>x<height>-<format>". Verified against Sanity's docs
+# rather than assumed — getting this wrong means every image breaks.
+_IMAGE_REF_PATTERN = re.compile(r"^image-([a-zA-Z0-9]+)-(\d+x\d+)-(\w+)$")
+
+
+def _sanity_image_url(ref, max_width=1600):
+    match = _IMAGE_REF_PATTERN.match(ref or "")
+    if not match:
+        return None
+    asset_hash, dims, fmt = match.groups()
+    # max_width caps what gets downloaded — the free plan's bandwidth is
+    # limited, and nothing in this design needs a full-resolution original.
+    return "https://cdn.sanity.io/images/%s/%s/%s-%s.%s?w=%d&auto=format" % (
+        SANITY_PROJECT_ID,
+        SANITY_DATASET,
+        asset_hash,
+        dims,
+        fmt,
+        max_width,
+    )
+
+
+def _render_sanity_image(node, *_args):
+    url = _sanity_image_url((node.get("asset") or {}).get("_ref"))
+    if not url:
+        return ""
+    alt = htmllib.escape(node.get("alt", "") or "", quote=True)
+    return '<img src="%s" alt="%s">' % (htmllib.escape(url, quote=True), alt)
+
+
+def portable_text_to_html(blocks):
+    """Render Sanity's rich-text format (a list of block objects) to HTML."""
+    if not blocks:
+        return ""
+    renderer = PortableTextRenderer(
+        blocks,
+        custom_marker_definitions={"link": _SafeLinkMarkerDefinition},
+        custom_serializers={"image": _render_sanity_image},
+    )
+    # The library always wraps multi-block output in <div>...</div> and
+    # exposes no constructor option to turn that off — only this attribute.
+    renderer._wrapper_element = ""
+    return renderer.render().strip()
+
+
+def fetch_sanity_posts():
+    if not SANITY_PROJECT_ID:
+        print("  Sanity: not configured (SANITY_PROJECT_ID unset) — posts/*.md only")
+        return []
+
+    query = '*[_type == "post"] | order(date desc){ _id, title, "slug": slug.current, date, body }'
+    url = "https://%s.apicdn.sanity.io/v%s/data/query/%s?query=%s" % (
+        SANITY_PROJECT_ID,
+        SANITY_API_VERSION,
+        SANITY_DATASET,
+        urllib.parse.quote(query),
+    )
+
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        print("  ! could not reach Sanity (%s) — continuing with posts/*.md only" % exc)
+        return []
+
+    posts = []
+    for raw in payload.get("result", []):
+        if str(raw.get("_id", "")).startswith("drafts."):
+            continue
+        title = (raw.get("title") or "").strip()
+        posts.append(
+            {
+                "slug": (raw.get("slug") or "").strip(),
+                "title": title,
+                "date": (raw.get("date") or "").strip(),
+                "body_html": portable_text_to_html(raw.get("body")),
+                "source": "Sanity: %s" % (title or raw.get("slug") or "untitled"),
+            }
+        )
+    print("  Sanity: fetched %d post(s)" % len(posts))
+    return posts
+
+
 def load_posts():
     posts = [parse_post(p) for p in sorted(POSTS_DIR.glob("*.md"))]
+    posts += fetch_sanity_posts()
     validate_posts(posts)
     posts.sort(key=lambda p: p["date"], reverse=True)
     return posts
@@ -318,7 +472,7 @@ def main():
     about_tpl = (PARTIALS_DIR / "about-template.html").read_text(encoding="utf-8")
 
     posts = load_posts()
-    print("Found %d post(s) in posts/" % len(posts))
+    print("Found %d post(s) total" % len(posts))
 
     clean_generated()
 
