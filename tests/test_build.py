@@ -1,16 +1,10 @@
 """
 Tests for build.py.
 
-The markdown tests below are deliberately split in two:
-
-  - What the converter supports today, pinned so it cannot silently regress.
-  - What it does NOT support, recorded exactly as it currently behaves.
-
-That second group is the Phase 0 audit finding: a browser CMS emits all of
-this, and today the converter turns it into visibly wrong output without
-raising an error. Phase 2 fixes that. When it does, those tests get rewritten
-to assert correct output instead — they are here so the damage is visible and
-cannot be forgotten.
+The markdown converter is markdown-it-py (CommonMark + GFM tables and
+strikethrough), configured with html=False. That configuration is itself a
+security decision — see test_raw_html_is_escaped_not_passed_through below —
+and is pinned here so a future edit cannot loosen it by accident.
 """
 
 import importlib.util
@@ -26,23 +20,51 @@ sys.modules["build"] = build
 spec.loader.exec_module(build)
 
 
-# ---------------------------------------------------------------- supported
+# ---------------------------------------------------------------- markdown
 
 
 @pytest.mark.parametrize(
-    "source,expected",
+    "label,source,expected",
     [
-        ("## Sub heading", "<h2>Sub heading</h2>"),
-        ("Just a paragraph.", "<p>Just a paragraph.</p>"),
-        ("- one\n- two", "<ul><li>one</li><li>two</li></ul>"),
-        ("> quoted", "<blockquote>quoted</blockquote>"),
-        ("**bold**", "<p><strong>bold</strong></p>"),
-        ("*italic*", "<p><em>italic</em></p>"),
-        ("`code`", "<p><code>code</code></p>"),
-        ("[text](https://example.com)", '<p><a href="https://example.com">text</a></p>'),
+        ("h1", "# Big", "<h1>Big</h1>"),
+        ("h2", "## Sub heading", "<h2>Sub heading</h2>"),
+        ("h3", "### Small", "<h3>Small</h3>"),
+        ("paragraph", "Just a paragraph.", "<p>Just a paragraph.</p>"),
+        ("bold", "**bold**", "<p><strong>bold</strong></p>"),
+        ("italic", "*italic*", "<p><em>italic</em></p>"),
+        ("inline code", "`code`", "<p><code>code</code></p>"),
+        (
+            "link",
+            "[text](https://example.com)",
+            '<p><a href="https://example.com">text</a></p>',
+        ),
+        ("unordered list", "- one\n- two", "<ul>\n<li>one</li>\n<li>two</li>\n</ul>"),
+        (
+            "ordered list",
+            "1. first\n2. second",
+            "<ol>\n<li>first</li>\n<li>second</li>\n</ol>",
+        ),
+        (
+            "nested list",
+            "- top\n  - nested",
+            "<ul>\n<li>top\n<ul>\n<li>nested</li>\n</ul>\n</li>\n</ul>",
+        ),
+        # CommonMark wraps blockquote text in <p> — this is spec-correct, not a bug.
+        ("blockquote", "> quoted", "<blockquote>\n<p>quoted</p>\n</blockquote>"),
+        ("image", "![cat](/img/cat.png)", '<p><img src="/img/cat.png" alt="cat" /></p>'),
+        (
+            "table",
+            "| a | b |\n|---|---|\n| 1 | 2 |",
+            "<table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n"
+            "<tbody>\n<tr>\n<td>1</td>\n<td>2</td>\n</tr>\n</tbody>\n</table>",
+        ),
+        ("horizontal rule (dashes)", "---", "<hr />"),
+        ("horizontal rule (stars)", "***", "<hr />"),
+        ("strikethrough", "~~gone~~", "<p><s>gone</s></p>"),
+        ("fenced code block", "```\nprint(1)\n```", "<pre><code>print(1)\n</code></pre>"),
     ],
 )
-def test_supported_markdown(source, expected):
+def test_supported_markdown(label, source, expected):
     assert build.md_to_html(source) == expected
 
 
@@ -50,34 +72,40 @@ def test_paragraphs_are_separated_by_blank_lines():
     assert build.md_to_html("one\n\ntwo") == "<p>one</p>\n<p>two</p>"
 
 
-def test_html_in_content_is_escaped():
-    assert "&lt;script&gt;" in build.md_to_html("<script>alert(1)</script>")
+def test_task_lists_are_not_enabled():
+    """
+    Not a bug: GFM task-list checkboxes need a separate plugin this project
+    does not install. "- [ ] todo" renders as a normal list item with the
+    brackets as literal text. Documented here so it reads as a deliberate
+    scope boundary, not a regression, if someone tries it and it looks odd.
+    """
+    assert build.md_to_html("- [ ] todo") == "<ul>\n<li>[ ] todo</li>\n</ul>"
 
 
-# ------------------------------------------------------- NOT supported yet
+# ----------------------------------------------------------------- security
 
 
-@pytest.mark.parametrize(
-    "label,source,current_broken_output",
-    [
-        ("h1", "# Big", "<p># Big</p>"),
-        ("h3", "### Small", "<p>### Small</p>"),
-        ("ordered list", "1. first\n2. second", "<p>1. first 2. second</p>"),
-        ("image", "![cat](/img/cat.png)", '<p>!<a href="/img/cat.png">cat</a></p>'),
-        ("table", "| a | b |", "<p>| a | b |</p>"),
-        ("horizontal rule", "***", "<p>***</p>"),
-        ("strikethrough", "~~gone~~", "<p>~~gone~~</p>"),
-        ("task list", "- [ ] todo", "<ul><li>[ ] todo</li></ul>"),
-    ],
-)
-def test_unsupported_markdown_is_currently_mangled(label, source, current_broken_output):
-    """Phase 0 finding, pinned. Phase 2 must make these either correct or loud."""
-    assert build.md_to_html(source) == current_broken_output
+def test_raw_html_is_escaped_not_passed_through():
+    """
+    CommonMark allows raw HTML passthrough by default. This project disables
+    that (html=False in build.py) specifically so a pasted <script> tag
+    cannot reach production unescaped.
+    """
+    assert (
+        build.md_to_html("<script>alert(1)</script>")
+        == "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>"
+    )
 
 
-def test_image_does_not_produce_an_img_tag_yet():
-    """The single most dangerous gap: CMS image upload would render broken."""
-    assert "<img" not in build.md_to_html("![cat](/img/cat.png)")
+def test_javascript_url_is_not_rendered_as_a_link():
+    rendered = build.md_to_html("[click](javascript:alert(1))")
+    assert "<a" not in rendered
+    assert "javascript:" not in rendered or "href" not in rendered
+
+
+def test_data_url_is_not_rendered_as_a_link():
+    rendered = build.md_to_html("[click](data:text/html,<script>alert(1)</script>)")
+    assert 'href="data:' not in rendered
 
 
 # ---------------------------------------------------------------- posts
