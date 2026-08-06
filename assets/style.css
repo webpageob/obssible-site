@@ -124,8 +124,10 @@ button:disabled { opacity: 0.45; cursor: default; }
   border: 0;
 }
 
-/* section labels — quieter now that signup carries the weight */
-h2 {
+/* Section labels — the small uppercase headings.
+   This is a CLASS, not a bare h2, on purpose: post bodies contain real
+   h2 headings, and styling the bare tag would fight with them. */
+.section-label {
   margin: 0 0 1.4rem;
   font-size: 0.72rem;
   font-weight: 600;
@@ -152,7 +154,7 @@ h2 {
 .note-card .def { margin: 0; }
 
 /* log / book / who — de-emphasized, footnote weight */
-.tight h2 { margin-bottom: 1.1rem; }
+.tight .section-label { margin-bottom: 1.1rem; }
 .tight p { margin-bottom: 0.55rem; font-size: 0.96rem; }
 .book-title { font-weight: 600; color: var(--fg); font-size: 1rem; }
 .status { color: var(--muted); font-size: 0.9rem; }
@@ -169,13 +171,17 @@ h2 {
   font-size: 0.85rem;
   color: var(--muted);
 }
-.log h3 {
+/* Post title. h1 because it is the page's main heading.
+   letter-spacing is reset because the global h1 rule tightens it. */
+.log h1 {
   margin: 0 0 1.2rem;
   font-size: 1.2rem;
   line-height: 1.35;
   font-weight: 600;
+  letter-spacing: normal;
 }
-.log h4 {
+/* Subheadings inside post bodies (markdown "## ") */
+.log h2 {
   margin: 2rem 0 0.6rem;
   font-size: 1rem;
   font-weight: 600;

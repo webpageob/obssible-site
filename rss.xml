@@ -5,17 +5,17 @@
   <link>https://obssible.com/log/</link>
   <description>Every immersion session, published as it happens.</description>
   <language>en</language>
-  <lastBuildDate>Thu, 06 Aug 2026 00:57:58 +0000</lastBuildDate>
+  <lastBuildDate>Thu, 06 Aug 2026 01:45:20 +0000</lastBuildDate>
   <item>
     <title>This is where a log goes</title>
-    <link>https://obssible.com/log/example-entry.html</link>
-    <guid>https://obssible.com/log/example-entry.html</guid>
+    <link>https://obssible.com/log/example-entry/</link>
+    <guid>https://obssible.com/log/example-entry/</guid>
     <pubDate>Wed, 05 Aug 2026 00:00:00 +0000</pubDate>
     <description>This file is a SAMPLE — delete it once you've written your first real entry. It exists only to prove build.py works and to show the markdown shapes it understands. The filename ( example-entry.md )…</description>
     <content:encoded><![CDATA[<p>This file is a SAMPLE — delete it once you've written your first real entry. It exists only to prove build.py works and to show the markdown shapes it understands.</p>
 <p>The filename (<code>example-entry.md</code>) doesn't matter — everything that matters (title, date, and the URL slug) is set right here at the top of the file, in the three lines between the <code>---</code> marks.</p>
 <p>A log is one session: the problem you were holding, how long you held it, and what came out.</p>
-<h4>A subheading looks like this</h4>
+<h2>A subheading looks like this</h2>
 <p>Ordinary paragraphs. <strong>Bold</strong>, <em>italic</em>, and <code>inline code</code> all work. So do <a href="https://example.com">links</a>.</p>
 <ul><li>A list item.</li><li>Another one.</li></ul>
 <blockquote>A quote, if a quote is needed.</blockquote>]]></content:encoded>
