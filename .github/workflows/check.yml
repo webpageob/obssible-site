@@ -3,10 +3,9 @@
 
 name: check
 
-on:
-  push:
-    branches: [main]
-  pull_request:
+# Every branch, not just main — the whole point is to catch problems
+# before they are merged into the live site.
+on: [push]
 
 jobs:
   check:
