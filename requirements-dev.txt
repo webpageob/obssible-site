@@ -1,0 +1,6 @@
+# Development tools only. The site build itself needs nothing but the
+# Python standard library — that is why Netlify installs nothing.
+#
+# Install with:  python -m pip install -r requirements-dev.txt
+ruff==0.16.1
+pytest==9.1.1

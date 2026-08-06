@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+# This project formats strings with % consistently throughout. Converting the
+# ~50 call sites to f-strings is churn with no behavioural benefit, and this is
+# not a codebase where string formatting is a bottleneck.
+ignore = ["UP031"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
