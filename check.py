@@ -11,7 +11,7 @@ none of it needs the network.
 
 What it runs, in order:
   1. ruff       — lint and formatting
-  2. pytest     — unit tests for the markdown converter and the build
+  2. pytest     — unit tests for the Sanity renderer and the build
   3. build      — the site must build cleanly
   4. idempotent — building twice must produce the same output
   5. output     — required metadata on every page, valid RSS and sitemap
@@ -253,7 +253,7 @@ def check_production_dependencies_are_pinned():
         fail("requirements.txt is missing — Netlify's build command depends on it")
         return
     text = req.read_text(encoding="utf-8")
-    for package in ("markdown-it-py==", "portabletext-html=="):
+    for package in ("portabletext-html==",):
         if package not in text:
             fail(
                 "requirements.txt does not pin an exact %s version — an unpinned "
@@ -261,7 +261,7 @@ def check_production_dependencies_are_pinned():
                 "nothing to review locally first" % package.rstrip("=")
             )
     if not failures:
-        ok("markdown-it-py and portabletext-html are version-pinned")
+        ok("portabletext-html is version-pinned")
 
 
 # ---------------------------------------------------------------- main

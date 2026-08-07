@@ -1,7 +1,7 @@
-# Netlify runs build.py on every push, then serves the generated files.
-#
-# This is what makes browser-based publishing possible: a CMS can only commit
-# markdown, it cannot run Python. Without this, saved posts would never appear.
+# Netlify runs build.py on every push, and also on the Sanity publish
+# webhook (see README.md "배포 구조") via a Build Hook. This is what makes
+# browser-based publishing possible — Sanity Studio can save content, but
+# it cannot run Python, so something else has to turn that content into HTML.
 
 [build]
   command = "pip install -r requirements.txt && python3 build.py"

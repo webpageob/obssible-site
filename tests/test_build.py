@@ -1,10 +1,9 @@
 """
 Tests for build.py.
 
-The markdown converter is markdown-it-py (CommonMark + GFM tables and
-strikethrough), configured with html=False. That configuration is itself a
-security decision — see test_raw_html_is_escaped_not_passed_through below —
-and is pinned here so a future edit cannot loosen it by accident.
+Posts come from Sanity, rendered from Portable Text via portabletext-html
+with a custom link serializer (see test_portable_text_dangerous_link_is_not_rendered_as_a_tag
+below) that closes an href-injection hole the library's default doesn't.
 """
 
 import importlib.util
@@ -19,94 +18,6 @@ spec = importlib.util.spec_from_file_location("build", ROOT / "build.py")
 build = importlib.util.module_from_spec(spec)
 sys.modules["build"] = build
 spec.loader.exec_module(build)
-
-
-# ---------------------------------------------------------------- markdown
-
-
-@pytest.mark.parametrize(
-    "label,source,expected",
-    [
-        ("h1", "# Big", "<h1>Big</h1>"),
-        ("h2", "## Sub heading", "<h2>Sub heading</h2>"),
-        ("h3", "### Small", "<h3>Small</h3>"),
-        ("paragraph", "Just a paragraph.", "<p>Just a paragraph.</p>"),
-        ("bold", "**bold**", "<p><strong>bold</strong></p>"),
-        ("italic", "*italic*", "<p><em>italic</em></p>"),
-        ("inline code", "`code`", "<p><code>code</code></p>"),
-        (
-            "link",
-            "[text](https://example.com)",
-            '<p><a href="https://example.com">text</a></p>',
-        ),
-        ("unordered list", "- one\n- two", "<ul>\n<li>one</li>\n<li>two</li>\n</ul>"),
-        (
-            "ordered list",
-            "1. first\n2. second",
-            "<ol>\n<li>first</li>\n<li>second</li>\n</ol>",
-        ),
-        (
-            "nested list",
-            "- top\n  - nested",
-            "<ul>\n<li>top\n<ul>\n<li>nested</li>\n</ul>\n</li>\n</ul>",
-        ),
-        # CommonMark wraps blockquote text in <p> — this is spec-correct, not a bug.
-        ("blockquote", "> quoted", "<blockquote>\n<p>quoted</p>\n</blockquote>"),
-        ("image", "![cat](/img/cat.png)", '<p><img src="/img/cat.png" alt="cat" /></p>'),
-        (
-            "table",
-            "| a | b |\n|---|---|\n| 1 | 2 |",
-            "<table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n"
-            "<tbody>\n<tr>\n<td>1</td>\n<td>2</td>\n</tr>\n</tbody>\n</table>",
-        ),
-        ("horizontal rule (dashes)", "---", "<hr />"),
-        ("horizontal rule (stars)", "***", "<hr />"),
-        ("strikethrough", "~~gone~~", "<p><s>gone</s></p>"),
-        ("fenced code block", "```\nprint(1)\n```", "<pre><code>print(1)\n</code></pre>"),
-    ],
-)
-def test_supported_markdown(label, source, expected):
-    assert build.md_to_html(source) == expected
-
-
-def test_paragraphs_are_separated_by_blank_lines():
-    assert build.md_to_html("one\n\ntwo") == "<p>one</p>\n<p>two</p>"
-
-
-def test_task_lists_are_not_enabled():
-    """
-    Not a bug: GFM task-list checkboxes need a separate plugin this project
-    does not install. "- [ ] todo" renders as a normal list item with the
-    brackets as literal text. Documented here so it reads as a deliberate
-    scope boundary, not a regression, if someone tries it and it looks odd.
-    """
-    assert build.md_to_html("- [ ] todo") == "<ul>\n<li>[ ] todo</li>\n</ul>"
-
-
-# ----------------------------------------------------------------- security
-
-
-def test_raw_html_is_escaped_not_passed_through():
-    """
-    CommonMark allows raw HTML passthrough by default. This project disables
-    that (html=False in build.py) specifically so a pasted <script> tag
-    cannot reach production unescaped.
-    """
-    assert (
-        build.md_to_html("<script>alert(1)</script>")
-        == "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>"
-    )
-
-
-def test_javascript_url_is_not_rendered_as_a_link():
-    rendered = build.md_to_html("[click](javascript:alert(1))")
-    assert "<a" not in rendered
-    assert "javascript:" not in rendered or "href" not in rendered
-
-
-def test_data_url_is_not_rendered_as_a_link():
-    rendered = build.md_to_html("[click](data:text/html,<script>alert(1)</script>)")
-    assert 'href="data:' not in rendered
 
 
 # ---------------------------------------------------------------- sanity
@@ -224,25 +135,28 @@ def test_fetch_sanity_posts_returns_empty_list_when_unconfigured(monkeypatch):
     assert build.fetch_sanity_posts() == []
 
 
-def test_fetch_sanity_posts_falls_back_on_network_failure(monkeypatch):
-    """The build must never crash because Sanity is unreachable — see the
-    module docstring: posts/*.md is the fallback during this migration."""
+def test_fetch_sanity_posts_fails_the_build_on_network_failure(monkeypatch):
+    """
+    There is no posts/*.md fallback anymore — if a project ID is configured
+    but Sanity can't be reached, the build must stop loudly, not deploy a
+    site silently missing content.
+    """
     monkeypatch.setattr(build, "SANITY_PROJECT_ID", "proj123")
 
     def _boom(*a, **k):
         raise build.urllib.error.URLError("simulated network failure")
 
     monkeypatch.setattr(build.urllib.request, "urlopen", _boom)
-    assert build.fetch_sanity_posts() == []
+    with pytest.raises(SystemExit) as exc:
+        build.fetch_sanity_posts()
+    assert "simulated network failure" in str(exc.value)
 
 
 def test_fetch_sanity_posts_parses_a_realistic_response(monkeypatch):
     """
     End-to-end: a response shaped like what Sanity's own API actually
-    returns (verified format, not guessed) goes in, a post dict shaped
-    like parse_post()'s output comes out — so the rest of build.py
-    (validation, sorting, RSS, sitemap, templates) needs no special case
-    for where a post came from.
+    returns (verified format, not guessed) goes in, the same post-dict
+    shape validate_posts()/build_rss()/build_sitemap() expect comes out.
     """
     monkeypatch.setattr(build, "SANITY_PROJECT_ID", "proj123")
 
@@ -303,75 +217,68 @@ def test_fetch_sanity_posts_parses_a_realistic_response(monkeypatch):
 # ---------------------------------------------------------------- posts
 
 
-def test_frontmatter_is_parsed(tmp_path):
-    post = tmp_path / "whatever-filename.md"
-    post.write_text(
-        "---\ntitle: My Title\ndate: 2026-01-02\nslug: my-slug\n---\nBody text.",
-        encoding="utf-8",
-    )
-    parsed = build.parse_post(post)
-    assert parsed["title"] == "My Title"
-    assert parsed["date"] == "2026-01-02"
-    assert parsed["slug"] == "my-slug"
-    assert "<p>Body text.</p>" in parsed["body_html"]
-
-
 def _post(source, slug="s", title="T", date="2026-01-01"):
     return {"source": source, "slug": slug, "title": title, "date": date, "body_html": ""}
 
 
 def test_valid_posts_pass_validation():
-    build.validate_posts([_post("a.md", slug="a"), _post("b.md", slug="b")])
+    build.validate_posts([_post("a", slug="a"), _post("b", slug="b")])
 
 
 def test_duplicate_slugs_fail_the_build():
     """Two posts with one slug means one silently overwrites the other."""
     with pytest.raises(SystemExit) as exc:
-        build.validate_posts([_post("a.md", slug="same"), _post("b.md", slug="same")])
+        build.validate_posts([_post("a", slug="same"), _post("b", slug="same")])
     message = str(exc.value)
     assert "same" in message
-    assert "a.md" in message and "b.md" in message
+    assert "a" in message and "b" in message
 
 
 def test_missing_date_fails_the_build():
     with pytest.raises(SystemExit) as exc:
-        build.validate_posts([_post("a.md", date="")])
-    assert "no 'date:'" in str(exc.value)
+        build.validate_posts([_post("a", date="")])
+    assert "no date" in str(exc.value)
 
 
 @pytest.mark.parametrize("bad_date", ["Aug 6 2026", "2026/08/06", "6-8-2026", "2026-8-6"])
 def test_malformed_date_fails_the_build(bad_date):
     with pytest.raises(SystemExit) as exc:
-        build.validate_posts([_post("a.md", date=bad_date)])
+        build.validate_posts([_post("a", date=bad_date)])
     assert "must look like" in str(exc.value)
 
 
 def test_missing_title_fails_the_build():
     with pytest.raises(SystemExit) as exc:
-        build.validate_posts([_post("a.md", title="")])
-    assert "no 'title:'" in str(exc.value)
+        build.validate_posts([_post("a", title="")])
+    assert "no title" in str(exc.value)
+
+
+def test_missing_slug_fails_the_build():
+    with pytest.raises(SystemExit) as exc:
+        build.validate_posts([_post("a", slug="")])
+    assert "no slug" in str(exc.value)
+
+
+@pytest.mark.parametrize("bad", ["../escape", "with/slash", "back\\slash"])
+def test_unsafe_slug_fails_the_build(bad):
+    """
+    Sanity's slug field has no format restriction beyond being required, so
+    a manually-typed slug could contain path-traversal characters. Nothing
+    else in build.py checks this before using the slug as a directory name
+    (out_dir = LOG_DIR / slug) — this is the only guard.
+    """
+    with pytest.raises(SystemExit) as exc:
+        build.validate_posts([_post("a", slug=bad)])
+    assert "unsafe slug" in str(exc.value)
 
 
 def test_all_problems_are_reported_at_once():
     """One build run should list every problem, not just the first."""
     with pytest.raises(SystemExit) as exc:
-        build.validate_posts([_post("a.md", slug="x", date=""), _post("b.md", slug="x")])
+        build.validate_posts([_post("a", slug="x", date=""), _post("b", slug="x")])
     message = str(exc.value)
-    assert "no 'date:'" in message
+    assert "no date" in message
     assert "slugs must be unique" in message
-
-
-def test_slug_falls_back_to_filename_when_missing(tmp_path):
-    post = tmp_path / "fallback-name.md"
-    post.write_text("---\ntitle: T\ndate: 2026-01-01\n---\nBody.", encoding="utf-8")
-    assert build.parse_post(post)["slug"] == "fallback-name"
-
-
-@pytest.mark.parametrize("bad", ["../escape", "with/slash", "back\\slash"])
-def test_dangerous_slugs_are_rejected(tmp_path, bad):
-    post = tmp_path / "safe-name.md"
-    post.write_text("---\ntitle: T\ndate: 2026-01-01\nslug: %s\n---\nBody." % bad, encoding="utf-8")
-    assert build.parse_post(post)["slug"] == "safe-name"
 
 
 # ---------------------------------------------------------------- urls

@@ -2,87 +2,31 @@
 
 6개월 뒤에 봐도 알 수 있게 순서대로 적는다.
 
-## 지금 상태 (2026-08-06) — 글쓰기 경로가 두 개다
+## 지금 상태 (2026-08-07) — Sanity 하나로 통일됨
 
-**Sanity**(브라우저에서 글 쓰는 전문 도구)로 옮기는 중인데, 아직 완전히 검증되지 않아서
-**예전 방식(`posts/` 폴더에 마크다운 파일)도 그대로 살아있다.** 둘 다 동시에 작동한다 —
-어느 쪽으로 글을 써도 사이트에 나온다.
+글은 전부 **Sanity Studio**(브라우저에서 쓰는 CMS)에서 쓴다. 예전에 있었던
+`posts/` 폴더 방식은 2026-08-07에 완전히 없앴다 — 실제 글 1편(이미지 포함)이
+Sanity → 라이브까지 문제없이 도는 걸 확인한 뒤 지운 것이다. (예전 버전이 필요하면
+git 이력에 남아있다.)
 
-- 아직 Sanity 설정을 안 했다면 → 이 문서 그대로, `posts/` 폴더 방식 (아래 "새 글 하나 올리기")
-- Sanity를 쓰고 싶다면 → 맨 아래 "Sanity 설정하기" 섹션부터
+## 새 글 하나 올리기
 
-**한쪽이 완전히 실제로 검증되기 전까지는 예전 방식을 지우지 않는다.** 이건 규칙이다 —
-글 쓸 방법이 하나도 없는 상태가 되는 걸 막기 위해서다.
+**1. https://obssible.sanity.studio/ 접속.**
 
-## 새 글 하나 올리기 — `posts/` 폴더 방식 (지금 당장 되는 방법)
+**2. 새 Post 만들기.** Title·Slug(오른쪽 "Generate" 버튼으로 제목에서 자동 생성)·Date·Body 채운다.
 
-**1. `posts/` 폴더에 마크다운 파일을 하나 만든다.**
-
-파일 이름은 아무거나 상관없다. 웹 주소는 파일 이름이 아니라 아래 `slug` 값으로 정해진다.
-
-**2. 맨 위에 이 세 줄을 넣는다.**
-
-```
----
-title: 글 제목
-date: 2026-08-06
-slug: 원하는-주소
----
-```
-
-- `title` — 페이지 제목
-- `date` — 목록 정렬 기준(최신순)이자 화면에 보이는 날짜
-- `slug` — 웹 주소가 된다. `slug: my-first-log` 이면 `obssible.com/log/my-first-log/`
-
-> ⚠️ **한 번 발행한 글의 `slug`는 절대 바꾸지 마라.** 공유된 링크가 깨지고,
+> ⚠️ **한 번 발행한 글의 Slug는 절대 바꾸지 마라.** 공유된 링크가 깨지고,
 > 뉴스레터가 "이미 보낸 글"인지 판단하는 기준이라 중복 발송이 날 수 있다.
 
-**3. 본문을 마크다운으로 쓴다.**
+**3. Publish 누른다.**
 
-표준 마크다운(CommonMark) + 표·취소선을 전부 지원한다:
-
-| 쓰면 | 결과 |
-|---|---|
-| `## 소제목` | 소제목 — **본문은 여기서부터 시작해라.** `#`(가장 큰 제목)은 페이지 제목 자리라 겹친다 |
-| 그냥 줄글 | 문단 |
-| `- 항목` / `1. 항목` | 목록 (번호·중첩 다 됨) |
-| `> 인용문` | 인용문 |
-| `` `코드` `` | 코드체 |
-| ` ```코드블록``` ` | 코드블록 (긴 줄은 안에서만 옆으로 스크롤) |
-| `**굵게**` / `*기울임*` / `~~취소선~~` | 굵게 / 기울임 / 취소선 |
-| `[글자](주소)` | 링크 |
-| `![대체글](주소)` | 이미지 |
-| 표 | 표 |
-| `---` | 구분선 |
-
-> 🚨 **아직 안 되는 것**: 체크박스 목록(`- [ ] 할일`)만 예외다. 대괄호가 글자 그대로 나온다.
-> 흔히 쓰는 문법은 아니라 지금은 안 넣었다.
-
-> 🔒 **원시 HTML은 안 통한다.** `<script>`처럼 직접 HTML 태그를 붙여넣으면 코드가 실행되지
-> 않고 화면에 그 글자 그대로 보인다. 의도한 안전장치다.
-
-**4. 검사를 돌린다.**
-
-```bash
-python check.py
-```
-
-전부 통과하면 다음으로 간다. 실패하면 무엇이 잘못됐는지 화면에 나온다.
-
-**5. GitHub에 올린다.**
-
-```bash
-git add -A
-git commit -m "새 로그: 제목"
-git push
-```
-
-**6. 끝.** Netlify가 알아서 빌드해서 `obssible.com`에 올린다. 몇 십 초 걸린다.
+**4. 끝.** Sanity 웹훅이 Netlify를 자동으로 재빌드시킨다 — git도, 터미널도 필요 없다.
+Publish 후 대략 10~20초 안에 `obssible.com`에 뜬다.
 
 ## 화면으로 미리 보고 싶으면
 
 ```bash
-python build.py
+SANITY_PROJECT_ID=gqrw1ms5 python build.py
 python -m http.server 4173
 ```
 
@@ -90,8 +34,8 @@ python -m http.server 4173
 
 ## 글 고치기 / 지우기
 
-`posts/` 안의 `.md` 파일을 고치거나 지우고 4~5번을 다시 하면 된다.
-지우면 해당 글 페이지도 자동으로 사라진다.
+Sanity Studio에서 해당 글을 열어 수정 후 Publish, 또는 문서 메뉴에서 삭제한다.
+삭제하면 웹훅이 다시 돌면서 해당 글 페이지도 자동으로 사라진다.
 
 ## 어떤 파일을 만지고, 어떤 파일을 만지면 안 되나
 
@@ -99,8 +43,7 @@ python -m http.server 4173
 
 | 파일 | 용도 |
 |---|---|
-| `posts/*.md` | **글 (예전 방식).** Sanity 검증 끝나면 없어질 예정 |
-| Sanity Studio 화면 | **글 (새 방식).** 터미널도 git도 필요 없다 |
+| Sanity Studio 화면 | **글.** 터미널도 git도 필요 없다 |
 | `studio-schema/post.js` | Sanity에 "글은 이런 모양이다"라고 알려주는 설정. Studio 만들 때 한 번만 씀 |
 | `partials/home-template.html` | 홈 화면 내용 |
 | `partials/about-template.html` | About 페이지 내용 |
@@ -130,7 +73,7 @@ python -m http.server 4173
 `python check.py` 가 순서대로 확인하는 것:
 
 1. 코드 스타일 (ruff)
-2. 테스트들 (pytest) — 마크다운 변환, Sanity 응답 처리, 주소 규칙, 템플릿, 보안
+2. 테스트들 (pytest) — Sanity 응답 처리, 주소 규칙, 템플릿, 보안
 3. `requirements.txt`에 정확한 버전이 박혀 있는가
 4. 빌드가 성공하는가
 5. **빌드를 두 번 해도 결과가 같은가**
@@ -152,23 +95,40 @@ python -m pip install -r requirements-dev.txt
 
 ## 배포 구조
 
+두 가지 경로가 있다.
+
+**글을 쓸 때 (Sanity):**
+
 ```
-posts/*.md 수정 또는 Sanity에 발행
+Sanity Studio에서 Publish
+        ↓ Sanity 웹훅이 Netlify Build Hook을 호출
+Netlify가 requirements.txt 설치 → build.py 실행 (Sanity 서버에 물어봄)
         ↓
-   git push (posts/를 고쳤을 때만 필요 — Sanity는 push 없이 바로 반영)
+obssible.com 갱신 (Publish 후 대략 10~20초)
+```
+
+git도 터미널도 필요 없다.
+
+**코드를 고칠 때 (`build.py`, `partials/`, `assets/style.css`, `studio-schema/` 등):**
+
+```
+파일 수정 → python check.py → git push
         ↓
-Netlify가 requirements.txt 설치 → build.py 실행
-        ↓ build.py가 이 순간 Sanity 서버에 물어봄
+Netlify가 GitHub push를 감지해서 같은 방식으로 재빌드
+        ↓
 obssible.com 갱신
 ```
 
-**Sanity로 글을 쓰면 git push가 필요 없다.** 다만 지금은 Netlify가 push를 받아야만
-다시 빌드하므로, Sanity에만 새 글을 올렸을 때 사이트에 바로 반영되진 않는다 — 이건
-검증이 끝나면 자동으로 다시 빌드되도록 손볼 항목이다. 지금 당장은 Sanity에 글을 쓴
-다음 아무 빈 커밋이나 하나 올리면 (`git commit --allow-empty -m "rebuild"`) 강제로
-새로고침된다.
+**Sanity 웹훅 설정 위치**: `sanity.io/manage` → 프로젝트(`gqrw1ms5`) → API → Webhooks.
+이름 `sanity-publish`, dataset `production`, filter `_type == "post"`, 대상은 Netlify의
+Build Hook URL. 둘 다 이미 연결되어 있다 — 새로 설정할 필요 없음, 문제 생겼을 때 확인할
+위치로만 기록해둔다.
 
-## Sanity 설정하기 (처음 한 번만)
+## Sanity 설정하기 (참고용 — 이미 완료됨)
+
+이 프로젝트는 이미 설정이 끝났다(프로젝트 ID `gqrw1ms5`, Studio는
+https://obssible.sanity.studio/ ). 아래는 그때 어떻게 했는지 기록이다 —
+새 프로젝트를 처음부터 다시 만들 일이 생기면 참고한다.
 
 ### 👤 당신이 직접 할 것
 
@@ -217,10 +177,10 @@ npx sanity deploy
 `sanity.config.js` 파일을 열면 맨 위에 `projectId: 'abc12345'` 같은 줄이 있다.
 그 `abc12345` 부분(프로젝트 ID)을 복사해서 나한테 알려달라.
 
-### 그다음은 내가 한다
+### 그다음 (이미 끝남)
 
-프로젝트 ID를 받으면:
-- Netlify에 그 값을 환경변수(`SANITY_PROJECT_ID`)로 설정하는 방법을 안내
-- 실제로 Studio에서 글 하나를 써달라고 요청 → 사이트에 정상적으로 뜨는지 함께 확인
-- 이미지 업로드, RSS, 사이트맵까지 전부 실제 데이터로 재검증
-- 전부 확인되면 `posts/` 경로를 없애는 작업을 별도로 진행 (지금은 안 함)
+- Netlify 환경변수 `SANITY_PROJECT_ID=gqrw1ms5` 설정 ✅
+- Studio에서 실제 글 발행 → 사이트에 정상적으로 뜨는지 확인 ✅
+- 이미지 업로드, RSS, 사이트맵, Buttondown까지 실제 데이터로 재검증 ✅
+- Sanity 웹훅 → Netlify Build Hook 연결 (Publish하면 자동 재빌드) ✅
+- `posts/` 경로와 `markdown-it-py` 제거 ✅ (2026-08-07)

@@ -2,7 +2,5 @@
 # Pinned to exact versions — an unpinned package could change output HTML
 # on a Netlify rebuild with no local change to review first.
 #
-# markdown-it-py    renders posts/*.md (legacy path, being phased out)
-# portabletext-html renders Sanity's rich-text format (new path)
-markdown-it-py==4.2.0
+# portabletext-html renders Sanity's rich-text format
 portabletext-html==1.1.3

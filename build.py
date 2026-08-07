@@ -3,27 +3,23 @@
 build.py — turns posts into the /log/ pages, keeps nav + the homepage
 "latest log" teaser in sync, and regenerates the RSS feed.
 
-TRANSITIONAL STATE (started 2026-08-06): posts can come from TWO places
-at once — local posts/*.md files, and Sanity (a hosted CMS). This is
-deliberate, not an oversight. Sanity is the CMS being migrated to, but
-until it is fully verified in production, posts/*.md stays live as a
-working fallback — the project must never be left without a way to
-publish. Once Sanity has been used for real, working posts and that is
-confirmed end to end, posts/*.md and this note get removed in a separate
-change. See README.md.
+Posts live in Sanity (a hosted CMS) — build.py fetches them at build time.
+This project used to also support local posts/*.md files as a fallback
+while Sanity was being verified in production; that fallback was removed
+2026-08-07 once a real post (with an image) was published through Sanity
+and confirmed live end to end. See README.md and git history if you need
+the old dual-path version.
 
-Needs two packages: markdown-it-py and portabletext-html (see
-requirements.txt). Everything else is the standard library — including
-the Sanity fetch, which is a plain HTTP GET, no SDK.
+Needs one package: portabletext-html (see requirements.txt). Everything
+else is the standard library — including the Sanity fetch, which is a
+plain HTTP GET, no SDK.
 
-Run it every time you add, edit, delete, or rename a file in posts/,
-after publishing in Sanity, or after editing partials/nav.html:
+Run it after publishing in Sanity, or after editing partials/nav.html:
 
     python build.py
 
 SOURCE (edit these):
-  - posts/*.md                 your writing (legacy path, see note above)
-  - Sanity Studio               your writing (new path)
+  - Sanity Studio               your writing
   - partials/*.html            page templates and the shared nav
   - assets/style.css           all styling
 
@@ -55,12 +51,10 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from markdown_it import MarkdownIt
 from portabletext_html import PortableTextRenderer
 from portabletext_html.marker_definitions import LinkMarkerDefinition
 
 ROOT = Path(__file__).parent
-POSTS_DIR = ROOT / "posts"
 LOG_DIR = ROOT / "log"
 PARTIALS_DIR = ROOT / "partials"
 
@@ -77,64 +71,11 @@ for _stream in (sys.stdout, sys.stderr):
 SITE_URL = "https://obssible.com"
 
 
-# ---------------------------------------------------------------- markdown
-
-# CommonMark + GFM tables/strikethrough. This covers everything a rich-text
-# CMS editor (Sveltia, Decap) can realistically emit — headings, lists
-# (ordered, unordered, nested), images, tables, code blocks, rules,
-# blockquotes, strikethrough, links, bold/italic.
-#
-# html=False is a deliberate, security-relevant choice: CommonMark allows raw
-# HTML passthrough by default, which would let a pasted <script> tag reach
-# production unescaped. This makes the parser treat raw HTML as plain text,
-# same as the parser it replaces.
-_md = MarkdownIt("commonmark", {"html": False}).enable(["table", "strikethrough"])
-
-
 def escape(text):
     return htmllib.escape(text, quote=False)
 
 
-def md_to_html(md_text):
-    # .strip() drops the single trailing newline markdown-it always emits,
-    # so output matches what the rest of build.py (and its tests) expect.
-    return _md.render(md_text).strip()
-
-
 # ---------------------------------------------------------------- posts
-
-
-def parse_post(path):
-    text = path.read_text(encoding="utf-8")
-    meta = {}
-    body = text
-    if text.startswith("---"):
-        end = text.find("\n---", 3)
-        if end != -1:
-            front = text[3:end].strip("\n")
-            body = text[end + 4 :]
-            for line in front.split("\n"):
-                if ":" in line:
-                    key, _, val = line.partition(":")
-                    meta[key.strip().lower()] = val.strip()
-
-    slug = meta.get("slug", "").strip()
-    if not slug or "/" in slug or "\\" in slug or ".." in slug:
-        if slug:
-            print("  ! bad slug in %s, using filename instead" % path.name)
-        slug = path.stem
-
-    title = meta.get("title", slug)
-    date = meta.get("date", "")
-
-    return {
-        "slug": slug,
-        "title": title,
-        "date": date,
-        "body_html": md_to_html(body),
-        "source": path.name,
-    }
-
 
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -144,19 +85,28 @@ def validate_posts(posts):
 
     These are hard failures, not warnings. A duplicate slug overwrites a real
     post and loses it; a missing or malformed date sorts unpredictably and
-    renders blank. Both are invisible once published, so the build stops here.
+    renders blank; an unsafe slug can write outside log/ entirely. All three
+    are invisible once published, so the build stops here.
     """
     problems = []
 
     for post in posts:
         if not post["date"]:
-            problems.append("%s has no 'date:' in its frontmatter" % post["source"])
+            problems.append("%s has no date" % post["source"])
         elif not DATE_PATTERN.match(post["date"]):
             problems.append(
                 "%s has date '%s' — it must look like 2026-08-06" % (post["source"], post["date"])
             )
         if not post["title"]:
-            problems.append("%s has no 'title:' in its frontmatter" % post["source"])
+            problems.append("%s has no title" % post["source"])
+        slug = post["slug"]
+        if not slug:
+            problems.append("%s has no slug" % post["source"])
+        elif "/" in slug or "\\" in slug or ".." in slug:
+            problems.append(
+                "%s has an unsafe slug '%s' — it must not contain / \\ or .."
+                % (post["source"], slug)
+            )
 
     by_slug = {}
     for post in posts:
@@ -186,11 +136,11 @@ def validate_posts(posts):
 # explicit filter below is defense in depth in case that ever changes
 # (e.g. if a token gets added to this query later).
 #
-# If SANITY_PROJECT_ID isn't set, or the request fails for any reason,
-# this returns an empty list rather than raising. During this transitional
-# period that is correct: the build must fall back to posts/*.md, not
-# fail. Once posts/*.md is removed (see the module docstring), a fetch
-# failure should become fatal instead — that change belongs with that step.
+# If SANITY_PROJECT_ID isn't set, this returns an empty list rather than
+# raising — that's a legitimate state (local dev, CI) where the site should
+# still build with zero posts. But once a project ID IS given, a failed
+# fetch is fatal: there is no posts/*.md fallback left, so silently
+# continuing would deploy a site missing content with no error anywhere.
 
 SANITY_PROJECT_ID = os.environ.get("SANITY_PROJECT_ID", "").strip()
 SANITY_DATASET = os.environ.get("SANITY_DATASET", "production").strip()
@@ -205,8 +155,8 @@ class _SafeLinkMarkerDefinition(LinkMarkerDefinition):
     that the default trusts href completely: no scheme check (a
     javascript: URL renders as a real, clickable link) and no attribute
     escaping (a crafted href can break out of the href="..." attribute).
-    This gives Sanity-sourced links the same safety property the
-    markdown-it-py path already has.
+    This gives Sanity-sourced links the same safety property the raw href
+    would need regardless of source.
     """
 
     @classmethod
@@ -275,7 +225,7 @@ def portable_text_to_html(blocks):
 
 def fetch_sanity_posts():
     if not SANITY_PROJECT_ID:
-        print("  Sanity: not configured (SANITY_PROJECT_ID unset) — posts/*.md only")
+        print("  Sanity: not configured (SANITY_PROJECT_ID unset) — building with 0 posts")
         return []
 
     query = '*[_type == "post"] | order(date desc){ _id, title, "slug": slug.current, date, body }'
@@ -290,8 +240,7 @@ def fetch_sanity_posts():
         with urllib.request.urlopen(url, timeout=10) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-        print("  ! could not reach Sanity (%s) — continuing with posts/*.md only" % exc)
-        return []
+        raise SystemExit("BUILD FAILED: could not reach Sanity (%s)" % exc) from exc
 
     posts = []
     for raw in payload.get("result", []):
@@ -312,8 +261,7 @@ def fetch_sanity_posts():
 
 
 def load_posts():
-    posts = [parse_post(p) for p in sorted(POSTS_DIR.glob("*.md"))]
-    posts += fetch_sanity_posts()
+    posts = fetch_sanity_posts()
     validate_posts(posts)
     posts.sort(key=lambda p: p["date"], reverse=True)
     return posts
